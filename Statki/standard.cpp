@@ -11,9 +11,6 @@
 
 using namespace std;
 
-//int X;
-//int Y;
-
 enum output {
     NO_ERRORS,
     PLAYER_WON,
@@ -21,6 +18,8 @@ enum output {
     NOT_IN_STARTING_POSITION,
     SHIP_ALREADY_PRESENT,
     ALL_ALREADY_SET,
+    FILD_DOES_NOT_EXIST,
+    NOT_ALL_SHIPS_PLACED,
 };
 enum directions {
     N,
@@ -46,15 +45,14 @@ struct ship {
     shipClass type{};
     int size = SHIP_SIZE;
     char ship_elements[SHIP_SIZE]{};
-    coords position[SHIP_SIZE]{};
-    bool trafiony[SHIP_SIZE] = { false, false, false, false, false };
+    coords position[SHIP_SIZE*10]{};
 };
 struct player {
-    ship ships[MAX_SHIPS];
-    int CAR = 1;
-    int BAT = 2;
-    int CRU = 3;
-    int DES = 4;
+    ship ships[MAX_SHIPS*10];
+    int CAR[2] = {1,1};
+    int BAT[2] = {2,2};
+    int CRU[2] = {3,3};
+    int DES[2] = {4,4};
     int shipIndex[4] = {};
 };
 
@@ -93,18 +91,6 @@ void initialize_board(char board[X][Y]){
         for(int j=0; j<X; j++)
             board[j][i] = ' ';
 }
-//char **BOARD_SIZE(){
-//    char **board;
-//    board = new char *[Y];
-//    for( int i=0; i<Y; i++)
-//        board[i] = new char[X];
-//    
-//    for (int i = 0; i < Y; i++)
-//        for (int j = 0; j < X; j++)
-//            board[i][j] = ' ';
-//    return board;
-//}
-
 bool STARTING_POSITION(player_boundaries *P, int y, int x, directions Dd, shipClass sC) {
     int Bx[2], By[2];
     Bx[0] = (*P).x[0];
@@ -184,46 +170,50 @@ bool ALREADY_PRESENT(player *P,shipClass C, int i){
 bool ALREADY_SET(player *P, shipClass C){
     switch(C){
         case CAR:{
-            (*P).CAR --;
+            (*P).CAR[1] --;
             break;
         }
         case BAT:{
-            (*P).BAT --;
+            (*P).BAT[1] --;
             break;
         }
         case CRU:{
-            (*P).CRU --;
+            (*P).CRU[1] --;
             break;
         }
         case DES:{
-            (*P).DES --;
+            (*P).DES[1] --;
             break;
         }
     }
-    if((*P).CAR<0 || (*P).BAT<0 || (*P).CRU<0 || (*P).DES<0)
+    if((*P).CAR[1]<0 || (*P).BAT[1]<0 || (*P).CRU[1]<0 || (*P).DES[1]<0)
         return true;
     else
         return false;
 }
 
 void SET_FLEET(player *P, int a1, int a2, int a3, int a4) {
-    (*P).CAR = a1;
-    (*P).BAT = a2;
-    (*P).CRU = a3;
-    (*P).DES = a4;
+    (*P).CAR[0] = a1;
+    (*P).CAR[1] = a1;
+    (*P).BAT[0] = a2;
+    (*P).BAT[1] = a2;
+    (*P).CRU[0] = a3;
+    (*P).CRU[1] = a3;
+    (*P).DES[0] = a4;
+    (*P).DES[1] = a4;
 }
 bool SHOOT(player *P, char board[X][Y], int x, int y, int *wsk) {
     for (int i = 0; i < MAX_SHIPS; i++) {
         for (int j = 0; j < MAX_SHIPS; j++) {
-            if (x == (*P).ships[i].position[j].x && y == (*P).ships[i].position[j].y) {
+            if (x == (*P).ships[i].position[j].x && y == (*P).ships[i].position[j].y && (*P).ships[i].ship_elements[j] != 'x' && board[x][y] != 'x') {
                 board[x][y] = 'x';
                 (*wsk)--;
-                (*P).ships[i].trafiony[j] = true;
+                (*P).ships[i].ship_elements[j] = 'x';
                 return 0;
             }
         }
     }
-    return 1;
+    return 0;
 }
 void PLACE_SHIP(char board[X][Y], player *P, int* index, int x, int y, directions D, shipClass C, int* Remaining) {
 
@@ -231,38 +221,37 @@ void PLACE_SHIP(char board[X][Y], player *P, int* index, int x, int y, direction
     (*P).ships[*index].position[0].x = x;
     (*P).ships[*index].position[0].y = y;
     (*P).ships[*index].size = C;
-    //initializeShip(P.ships[*index]);
     *Remaining = (*Remaining + (*P).ships[*index].size);
     switch (D) {  
     case E: {
         for (int i = 0; i < (*P).ships[*index].size; i++){
-            board[x - i][y] = '+';//P.ships[*index].ship_elements[i];
-            (*P).ships->position[i+1].x = x-i;
-            (*P).ships->position[i+1].y = y;
+            board[x - i][y] = '+';
+            (*P).ships[*index].position[i].x = x-i;
+            (*P).ships[*index].position[i].y = y;
         }
         break;
     }
     case W: {
         for (int i = 0; i < (*P).ships[*index].size; i++){
-            board[x + i][y] = '+';//P.ships[*index].ship_elements[i];
-            (*P).ships->position[i+1].x = x+i;
-            (*P).ships->position[i+1].y = y;
+            board[x + i][y] = '+';
+            (*P).ships[*index].position[i].x = x+i;
+            (*P).ships[*index].position[i].y = y;
         }
         break;
     }
     case S: {
         for (int i = 0; i < (*P).ships[*index].size; i++){
-            board[x][y - i] = '+';//P.ships[*index].ship_elements[i];
-            (*P).ships->position[i+1].x = x;
-            (*P).ships->position[i+1].y = y-i;
+            board[x][y - i] = '+';
+            (*P).ships[*index].position[i].x = x;
+            (*P).ships[*index].position[i].y = y-i;
         }
         break;
     }
     case N: {
         for (int i = 0; i < (*P).ships[*index].size; i++){
-            board[x][y + i] = '+';//P.ships[*index].ship_elements[i];
-            (*P).ships->position[i+1].x = x;
-            (*P).ships->position[i+1].y = y+i;
+            board[x][y + i] = '+';
+            (*P).ships[*index].position[i].x = x;
+            (*P).ships[*index].position[i].y = y+i;
         }
         break;
     }
@@ -295,14 +284,6 @@ void state(char board[X][Y], player *A, player *B, int* aRemaining, int* bRemain
         }
         else if(compare(command,"BOARD_SIZE")){
             cin>>y>>x;
-            //int *pomX, *pomY;
-            //pomX=&X;
-            //pomY=&Y;
-            //*pomX=x;
-            //*pomY=y;
-            //delete [] *board;
-            //delete [] board;
-            //board = BOARD_SIZE();
             boundaries(bA, 0, X-1, 0, Y/2 -1);
             boundaries(bB, 0, X-1, Y/2+1, Y-1);
         }
@@ -362,7 +343,17 @@ output playerX(player *P,player *En, char board[X][Y], int* index, int* Remainin
         }
         else if (compare(playerCommand, "SHOOT")) {
             cin >> y >> x;
+            
+            if((((*P).CAR[0] - (*P).shipIndex[0])!=0 || ((*P).BAT[0] - (*P).shipIndex[1])!=0 || ((*P).CRU[0] - (*P).shipIndex[2])!=0 || ((*P).DES[0] - (*P).shipIndex[3])!=0) || (((*En).CAR[0] - (*En).shipIndex[0])!=0 || ((*En).BAT[0] - (*En).shipIndex[1])!=0 || ((*En).CRU[0] - (*En).shipIndex[2])!=0 || ((*En).DES[0] - (*En).shipIndex[3])!=0)){
+                cout<<"INVALID OPERATION "<<char(34)<<"SHOOT "<<y<<" "<<x<<char(34)<<": NOT ALL SHIPS PLACED";
+                return NOT_ALL_SHIPS_PLACED;
+            }
+            if(y>=Y || x>=X) {
+                cout<<"INVALID OPERATION "<<char(34)<<"SHOOT "<<y<<" "<<x<<char(34)<<": FIELD DOES NOT EXIST";
+                return FILD_DOES_NOT_EXIST;
+            }
             SHOOT(En,board,x,y,ERemaining);
+                
             if(victory_condition(ERemaining)){
                 return PLAYER_WON;
             }
@@ -378,10 +369,8 @@ output playerX(player *P,player *En, char board[X][Y], int* index, int* Remainin
 }
 
 int main() {
-    //X = 10;
-    //Y = 21;
     output test;
-    char board[X][Y]; //= BOARD_SIZE();
+    char board[X][Y];
     initialize_board(board);
     player A, B;
     player *wskA, *wskB;
@@ -394,35 +383,47 @@ int main() {
     boundaries(bB, 0, X-1, Y/2+1, Y-1);
  
     char command[10];
-    int a = 0, b = 0, aRemaining = 0, bRemaining = 0;
+    int a = 0, b = 0, aRemaining = 0, bRemaining = 0, p=0;
     int* wsk, * awsk, * bwsk;
     awsk = &aRemaining;
     bwsk = &bRemaining;
     while (cin >> command) {
-        if (compare(command, "[playerA]")) {
+        
+        if (compare(command, "[state]")) {
+            state(board, &A, &B, awsk, bwsk,bA,bB);
+        }
+        else if (compare(command, "[playerA]")) {
+            if(p%2==1){
+                cout<<"INVALID OPERATION "<<char(34)<<command<<" "<<char(34)<<": THE OTHER PLAYER EXPECTED";
+                return 1;
+            }
+            p++;
             wsk = &a;
             test = playerX(wskA,wskB, board, wsk, awsk,bwsk,bA);
             if(test == PLAYER_WON){
-                cout<<"PLAYER A WON";
+                cout<<"A won";
+                return 0;
             }
             else if (test != NO_ERRORS)
                 return 1;
         }
         else if (compare(command, "[playerB]")) {
+            if(p%2==0){
+                cout<<"INVALID OPERATION "<<char(34)<<command<<" "<<char(34)<<": THE OTHER PLAYER EXPECTED";
+                return 1;
+            }
+            p++;
             wsk = &b;
             test = playerX(wskB,wskA, board, wsk, bwsk,awsk,bB);
             if(test == PLAYER_WON){
-                cout<<"PLAYER B WON";
+                cout<<"B won";
+                return 0;
             }
             else if (test != NO_ERRORS)
                 return 1;
-        }
-        else if (compare(command, "[state]")) {
-            state(board, &A, &B, awsk, bwsk,bA,bB);
         }
     }
 
     return 0;
 }
-
 
