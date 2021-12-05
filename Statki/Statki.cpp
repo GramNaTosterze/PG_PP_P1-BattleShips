@@ -12,7 +12,7 @@ using namespace std;
 int X,Y;
 
 enum output {
-    NO_ERRORS,
+    NO_PROBLEMS,
     PLAYER_WON,
     INVALID_DIRECTION,
     NOT_IN_STARTING_POSITION,
@@ -20,6 +20,8 @@ enum output {
     ALL_ALREADY_SET,
     FILD_DOES_NOT_EXIST,
     NOT_ALL_SHIPS_PLACED,
+    PLACED_SHIP_ON_REEF,
+    SHIP_TO_CLOSE,
 };
 enum directions {
     N,
@@ -80,7 +82,7 @@ void boundaries(player_boundaries *P, int minX, int maxX, int minY, int maxY) {
     (*P).y[0] = minY;
     (*P).y[1] = maxY;  
 }
-directions toDirections(char D){
+directions convertToDirections(char D){
     if (D == 'N')
         return N;
     else if (D == 'E')
@@ -91,7 +93,7 @@ directions toDirections(char D){
         return W;
     return N;
 }
-shipClass toShipClass(char C[4]){
+shipClass convertToShipClass(char C[4]){
     if (compare(C, "CAR"))
         return CAR;
     else if (compare(C, "BAT"))
@@ -159,6 +161,7 @@ bool STARTING_POSITION(player_boundaries *P, int y, int x, directions Dd, shipCl
     }
     return 0;
 }
+//ALREADY_PRESENT zmieniać działa tylko w idealnych warunkach!!
 bool ALREADY_PRESENT(player *P,shipClass C, int i){
     switch(C) {
         case CAR:{
@@ -255,7 +258,10 @@ void PLACE_SHIP(char **board, player *P, int* index, int x, int y, directions D,
     switch (D) {  
     case E: {
         for (int i = 0; i < (*P).ships[*index].size; i++){
-            board[y][x - i] = '+';
+            if((*P).ships[*index].ship_elements[i] == '\0')
+                board[y][x - i] = '+';
+            else
+                board[y][x - i] = (*P).ships[*index].ship_elements[i];
             (*P).ships[*index].position[i].x = x-i;
             (*P).ships[*index].position[i].y = y;
         }
@@ -263,7 +269,10 @@ void PLACE_SHIP(char **board, player *P, int* index, int x, int y, directions D,
     }
     case W: {
         for (int i = 0; i < (*P).ships[*index].size; i++){
-            board[y][x + i] = '+';
+            if((*P).ships[*index].ship_elements[i] == '\0')
+                board[y][x + i] = '+';
+            else
+                board[y][x + i] = (*P).ships[*index].ship_elements[i];
             (*P).ships[*index].position[i].x = x+i;
             (*P).ships[*index].position[i].y = y;
         }
@@ -271,7 +280,10 @@ void PLACE_SHIP(char **board, player *P, int* index, int x, int y, directions D,
     }
     case S: {
         for (int i = 0; i < (*P).ships[*index].size; i++){
-            board[y - i][x] = '+';
+            if((*P).ships[*index].ship_elements[i] == '\0')
+                board[y - i][x] = '+';
+            else
+                board[y - i][x] = (*P).ships[*index].ship_elements[i];
             (*P).ships[*index].position[i].x = x;
             (*P).ships[*index].position[i].y = y-i;
         }
@@ -279,7 +291,10 @@ void PLACE_SHIP(char **board, player *P, int* index, int x, int y, directions D,
     }
     case N: {
         for (int i = 0; i < (*P).ships[*index].size; i++){
-            board[y + i][x] = '+';
+            if((*P).ships[*index].ship_elements[i] == '\0')
+                board[y + i][x] = '+';
+            else
+                board[y + i][x] = (*P).ships[*index].ship_elements[i];
             (*P).ships[*index].position[i].x = x;
             (*P).ships[*index].position[i].y = y+i;
         }
@@ -294,17 +309,120 @@ bool victory_condition (int *wsk){
     return 1;
 }
 
-void SHIP (char **board, player *P, int y, int x, directions D, shipClass C, char status[SHIP_SIZE], int *index, int *Remaining){
-    for(int i=0; i<SHIP_SIZE; i++)
-        if(status[i]=='1')
-            (*P).ships[*index].ship_elements[i]= '+';
-        else
-            (*P).ships[*index].ship_elements[i]= 'x';
+output SHIP (char **board, player *P, int y, int x, directions D, shipClass C, char status[SHIP_SIZE], int *index, int *Remaining, player_boundaries *bP){
     
-    PLACE_SHIP(board,P,index,x,y,D,C,Remaining);
+    for(int i=0; i<C; i++)
+        if(status[i] == '1'){
+            (*P).ships[*index].ship_elements[i]= '+';
+            }
+        else{
+            (*P).ships[*index].ship_elements[i]= 'x';
+            (*Remaining)--;
+        }
+        if (STARTING_POSITION(bP, y, x, D, C) == 1) {
+                cout << "INVALID OPERATION " << char(34) << "PLACE_SHIP " << y << " " << x << " " << D << " " << (*index) << " " << C << char(34) << ": NOT IN STARTING POSITION";
+                return NOT_IN_STARTING_POSITION;
+            }
+        else if(ALREADY_PRESENT(P,C,*index)){
+                cout << "INVALID OPERATION " << char(34) << "PLACE_SHIP " << y << " " << x << " " << D << " " << (*index) << " " << C << char(34) << ": SHIP ALREADY PRESENT";
+                return SHIP_ALREADY_PRESENT;
+            }
+        else if(ALREADY_SET(P,C)){
+                cout << "INVALID OPERATION " << char(34) << "PLACE_SHIP " << y << " " << x << " " << D << " " << (*index) << " " << C << char(34) << ": ALL SHIPS OF THE CLASS ALREADY SET";
+                return ALL_ALREADY_SET;
+            }
+        else if(SHIP_ON_REEF(board,y,x,D,C)){
+                cout<<"INVALID OPERATION "<<char(34)<<"PLACE_SHIP " << y << " " << x << " " << D << " " << (*index) << " " << C <<char(34)<<": PLACING SHIP ON REEF";
+                return PLACED_SHIP_ON_REEF;
+            }
+        else if(SHIPS_TO_CLOSE(board,bP,y,x,D,C)){
+                cout<<"INVALID OPERATION "<<char(34)<<"PLACE_SHIP " << y << " " << x << " " << D << " " << (*index) << " " << C <<char(34)<<": PLACING SHIP TOO CLOSE TO OTHER SHIP";
+                return SHIP_TO_CLOSE;
+            }
+        else
+            PLACE_SHIP(board, P, index, x, y, D, C, Remaining);
+    return NO_PROBLEMS;
+}
+bool SHIP_ON_REEF(char **board,int y,int x, directions D,shipClass C){
+    switch(D) {
+        case N:{
+            for(int i=0; i<C; i++){
+                if(board[y+i][x]=='#')
+                    return 1;
+            }   
+            return 0;
+        }
+        case E:{
+            for(int i=0; i<C; i++){
+                if(board[y][x+i]=='#')
+                    return 1;
+            }   
+            return 0;
+        }
+        case S:{
+            for(int i=0; i<C; i++){
+                if(board[y-i][x]=='#')
+                    return 1;
+            }   
+            return 0;
+        }
+        case W:{
+            for(int i=0; i<C; i++){
+                if(board[y][x-i]=='#')
+                    return 1;
+            }   
+            return 0;
+        }
+    }
+    return 0;
+}
+bool SHIPS_TO_CLOSE(char **board, player_boundaries *P, int y, int x, directions D, shipClass C){
+    switch(D){
+        case N:{
+            for(int i=y-1; i<y+C; i++){
+                for(int j=x-1; j<x+2; j++){
+                    if(i>=(*P).y[0] && i<=(*P).y[1] && j>=(*P).x[0] && j<=(*P).x[1])
+                        if(board[i][j]!=' ')
+                            return 1;
+                }
+            }
+            return 0;
+        }
+        case E:{
+            for(int i=y-1; i<y+2; i++){
+                for(int j=x-C; j<x+1; j++){
+                    if(i>=(*P).y[0] && i<=(*P).y[1] && j>=(*P).x[0] && j<=(*P).x[1])
+                        if(board[i][j]!=' ')
+                            return 1;
+                }
+            }
+            return 0;
+        }
+        case S:{
+            for(int i=y-C; i<y+1; i++){
+                for(int j=x-1; j<x+2; j++){
+                    if(i>=(*P).y[0] && i<=(*P).y[1] && j>=(*P).x[0] && j<=(*P).x[1])
+                        if(board[i][j]!=' ')
+                            return 1;
+                }
+            }
+            return 0;
+        }
+        case W:{
+            for(int i=y-1; i<y+2; i++){
+                for(int j=x-1; j<x+C; j++){
+                    if(i>=(*P).y[0] && i<=(*P).y[1] && j>=(*P).x[0] && j<=(*P).x[1])
+                        if(board[i][j]!=' ')
+                            return 1;
+                }
+            }
+            return 0;
+        }
+    }
+    return 1;
 }
 
-void state(char **board, player *A, player *B, int* aRemaining, int* bRemaining, player_boundaries *bA, player_boundaries *bB, int *a, int *b) {
+output state(char **board, player *A, player *B, int* aRemaining, int* bRemaining, player_boundaries *bA, player_boundaries *bB, int *a, int *b, int *playerIndex) {
     char stateCommand[10], status[SHIP_SIZE],C[4];
     shipClass sC;
     directions Dd;
@@ -336,22 +454,36 @@ void state(char **board, player *A, player *B, int* aRemaining, int* bRemaining,
             boundaries(bB, 0, x-1, y/2+1, y-1);
         }
         else if(compare(stateCommand, "SHIP")){
-            cin>>P>>y>>x>>D>>C>>status;
+            int i;
+            cin>>P>>y>>x>>D>>i>>C>>status;
 
-            Dd = toDirections(D);
-            sC = toShipClass(C);
+            Dd = convertToDirections(D);
+            sC = convertToShipClass(C);
             if(P == 'A')
-                SHIP(board,A,y,x,Dd,sC,status,a,aRemaining);
+                SHIP(board,A,y,x,Dd,sC,status,a,aRemaining,bA);
             else
-                SHIP(board,B,y,x,Dd,sC,status,b,bRemaining);
+                SHIP(board,B,y,x,Dd,sC,status,b,bRemaining,bB);
+        }
+        else if(compare(stateCommand, "INIT_POSITION")){
+            int y1,y2,x1,x2;
+            cin>>y1>>x1>>y2>>x2;
+        }
+        else if(compare(stateCommand, "REEF")){
+            cin>>y>>x;
+            board[y][x] = '#';
         }
         else if (compare(stateCommand, "NEXT_PLAYER")) {
             cin>>P;
+            if(P == 'A')
+                *playerIndex = 0;
+            else
+                *playerIndex = 1;
         }
         else if (compare(stateCommand, "[state]")) {
-            break;
+            return NO_PROBLEMS;
         }
     }
+    return NO_PROBLEMS;
 }
 
 output playerX(player *P,player *En, char **board, int* index, int* Remaining, int* ERemaining, player_boundaries *bP) {
@@ -364,9 +496,9 @@ output playerX(player *P,player *En, char **board, int* index, int* Remaining, i
         if (compare(playerCommand, "PLACE_SHIP")) {
             cin >> y >> x >> D >> i >> C;
             
-            Dd = toDirections(D);
-            sC = toShipClass(C);
-
+            Dd = convertToDirections(D);
+            sC = convertToShipClass(C);
+            
             if (STARTING_POSITION(bP, y, x, Dd, sC) == 1) {
                 cout << "INVALID OPERATION " << char(34) << "PLACE_SHIP " << y << " " << x << " " << D << " " << i << " " << C << char(34) << ": NOT IN STARTING POSITION";
                 return NOT_IN_STARTING_POSITION;
@@ -378,6 +510,14 @@ output playerX(player *P,player *En, char **board, int* index, int* Remaining, i
             else if(ALREADY_SET(P,sC)){
                 cout << "INVALID OPERATION " << char(34) << "PLACE_SHIP " << y << " " << x << " " << D << " " << i << " " << C << char(34) << ": ALL SHIPS OF THE CLASS ALREADY SET";
                 return ALL_ALREADY_SET;
+            }
+            else if(SHIP_ON_REEF(board,y,x,Dd,sC)){
+                cout<<"INVALID OPERATION "<<char(34)<<"PLACE_SHIP " << y << " " << x << " " << D << " " << i << " " << C <<char(34)<<": PLACING SHIP ON REEF";
+                return PLACED_SHIP_ON_REEF;
+            }
+            else if(SHIPS_TO_CLOSE(board,bP,y,x,Dd,sC)){
+                cout<<"INVALID OPERATION "<<char(34)<<"PLACE_SHIP " << y << " " << x << " " << D << " " << i << " " << C <<char(34)<<": PLACING SHIP TOO CLOSE TO OTHER SHIP";
+                return SHIP_TO_CLOSE;
             }
             else
                 PLACE_SHIP(board, P, index, x, y, Dd, sC, Remaining);
@@ -401,13 +541,13 @@ output playerX(player *P,player *En, char **board, int* index, int* Remaining, i
             }
         }
         else if (compare(playerCommand, "[playerA]")) {
-            return NO_ERRORS;
+            return NO_PROBLEMS;
         }
         else if (compare(playerCommand, "[playerB]")) {
-            return NO_ERRORS;
+            return NO_PROBLEMS;
         }
     }
-    return NO_ERRORS;
+    return NO_PROBLEMS;
 }
 
 int main() {
@@ -433,7 +573,9 @@ int main() {
     while (cin >> command) {
         
         if (compare(command, "[state]")) {
-            state(board, &A, &B, awsk, bwsk,bA,bB,&a,&b);
+            wsk = &p;
+            if(state(board, &A, &B, awsk, bwsk,bA,bB,&a,&b,wsk)!=NO_PROBLEMS);
+                return 1;
         }
         else if (compare(command, "[playerA]")) {
             if(p%2==1){
@@ -447,7 +589,7 @@ int main() {
                 cout<<"A won";
                 return 0;
             }
-            else if (test != NO_ERRORS)
+            else if (test != NO_PROBLEMS)
                 return 1;
         }
         else if (compare(command, "[playerB]")) {
@@ -462,7 +604,7 @@ int main() {
                 cout<<"B won";
                 return 0;
             }
-            else if (test != NO_ERRORS)
+            else if (test != NO_PROBLEMS)
                 return 1;
         }
     }
